@@ -7,8 +7,30 @@ from typing import Self
 OS_ENV_KEY = "APP_ENV" # Environment variable key for application environment
 
 class Environment(Enum):
-    
-    """Enumeration for application environments."""
+    """Enumeration for application environments.
+
+    This enum provides a set of predefined environments for the application,
+    including production, staging, development, and testing.
+
+    Class Methods:
+        current: Returns the current environment from the APP_ENV environment variable.
+        set_current_to: Sets the current environment to the specified value.
+        get_dotenv_filename: Gets the appropriate .env filename based on the current environment.
+
+    Instance Methods:
+        is_development: Returns True if the environment is development.
+        is_staging: Returns True if the environment is staging.
+        is_production: Returns True if the environment is production.
+        is_testing: Returns True if the environment is testing.
+        dotenv_filename: Gets the appropriate .env file for the current environment.
+
+    Attributes:
+        PRODUCTION: Represents the production environment.
+        STAGING: Represents the staging environment.
+        DEVELOPMENT: Represents the development environment.
+        TESTING: Represents the testing environment.
+    """
+
     PRODUCTION  = "production"
     STAGING     = "staging"
     DEVELOPMENT = "development"
@@ -45,8 +67,11 @@ class Environment(Enum):
         return f'.env.{cls.current().value}'
 
 
-def get_current_env() -> Environment: return Environment.current()
+def get_current_env() -> Environment: 
+    """Get the current environment."""
+    return Environment.current()
+
 def set_current_env(env: str | Environment) -> Environment:
     """Sets the current environment to the specified value and returns it."""
     Environment.set_current_to(env)
-    return get_current_env()  
+    return get_current_env()

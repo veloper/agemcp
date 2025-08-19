@@ -14,7 +14,36 @@ else:
     T = TypeVar("T", bound=Any)
 
 class ListRootModel(RootModel[List[T]], Generic[T]):
-    """Base RootModel for ObservableList with shared logic and preserved typing."""
+    """Base RootModel for ObservableList with shared logic and preserved typing.
+
+    This class provides a typed root model for collections of items (such as edges or vertices)
+    that belong to a graph. It supports serialization, validation, and mapped list methods,
+    while maintaining a reference to the parent graph.
+
+    Attributes:
+        model_config (ConfigDict): Pydantic model configuration.
+        _graph (AgGraph | None): Reference to the parent graph, if any.
+
+    Properties:
+        graph (AgGraph | None): The graph this collection belongs to.
+
+    Methods:
+        custom_serializer(): Serializes the collection to a list.
+        ensure_items_have_graph(): Ensures all items reference the graph.
+        get_by_ident(ident): Returns items matching the given identifier.
+        append(item): Appends an item to the collection.
+        insert(index, item): Inserts an item at the given index.
+        extend(items): Extends the collection with items.
+        remove(item): Removes an item from the collection.
+        pop(index): Pops an item at the given index.
+        clear(): Clears the collection.
+        __setitem__(index, value): Sets an item at the given index.
+        __delitem__(index): Deletes an item at the given index.
+        __getitem__(index): Gets an item at the given index.
+        __iter__(): Iterates over the collection.
+        __contains__(item): Checks if an item is in the collection.
+        __len__(): Returns the length of the collection.
+    """
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
     )

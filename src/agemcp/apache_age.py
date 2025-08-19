@@ -17,10 +17,10 @@ class ApacheAGE:
     """An apache age repository for interacting with the apache age graph database."""
 
     async def load_age_extension(self):
-        async with dbs.sqlalchemy_transaction() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS age;"))
-            await conn.execute(text("LOAD 'age';"))
-            await conn.execute(text("SET search_path = ag_catalog, \"$user\", public;"))
+        async with dbs.sqlalchemy_transaction() as session:
+            await session.execute(text("CREATE EXTENSION IF NOT EXISTS age;"))
+            await session.execute(text("LOAD 'age';"))
+            await session.execute(text("SET search_path = ag_catalog, \"$user\", public;"))
 
     async def ensure_age_loaded(self):
         """Ensure the AGE extension is loaded and search_path is set."""
@@ -28,25 +28,25 @@ class ApacheAGE:
 
     async def create_graph(self, graph_name: str) -> AgGraph:
         await self.ensure_age_loaded()
-        async with dbs.sqlalchemy_transaction() as conn:
+        async with dbs.sqlalchemy_transaction() as session:
             query = text(f"SELECT create_graph('{graph_name}');")
-            await conn.execute(query)
+            await session.execute(query)
             return AgGraph(name=graph_name)
 
     async def drop_graph(self, graph_name: str) -> None:
         if not graph_name:
             raise ValueError("Graph name must be provided.")
         await self.ensure_age_loaded()
-        async with dbs.sqlalchemy_transaction() as conn:
+        async with dbs.sqlalchemy_transaction() as session:
             query = text(f"SELECT drop_graph('{graph_name}', true);")
-            await conn.execute(query)
+            await session.execute(query)
 
     async def truncate_graph(self, graph_name: str) -> None:
         """Truncate all vertices and edges in the graph."""
         if not graph_name:
             raise ValueError("Graph name must be provided.")
-        async with dbs.sqlalchemy_transaction() as conn:
-                await self.cypher_execute(graph_name, "MATCH (n) DETACH DELETE n")
+        async with dbs.sqlalchemy_transaction() as session:
+            await self.cypher_execute(graph_name, "MATCH (n) DETACH DELETE n")
 
     async def ensure_graph(self, graph_name: str) -> None:
         """Like create_graph, but does nothing if the graph already exists. """
@@ -72,30 +72,30 @@ class ApacheAGE:
 
     async def get_graph_names(self) -> list[str]:
         """Get all graph names from the AGE catalog."""
-        async with dbs.sqlalchemy_transaction() as conn:
-            result = await conn.execute(text("SELECT name FROM ag_catalog.ag_graph ORDER BY name;"))
+        async with dbs.sqlalchemy_transaction() as session:
+            result = await session.execute(text("SELECT name FROM ag_catalog.ag_graph ORDER BY name;"))
             rows = result.mappings().all()
             return [row['name'] for row in rows]
 
     async def run_cypher(self, graph_name: str, cypher_query: str):
-        async with dbs.sqlalchemy_transaction() as conn:
-            result = await conn.execute(text(f"SELECT * from cypher('{graph_name}', $$ {cypher_query} $$) as (v agtype);"))
+        async with dbs.sqlalchemy_transaction() as session:
+            result = await session.execute(text(f"SELECT * from cypher('{graph_name}', $$ {cypher_query} $$) as (v agtype);"))
             rows = result.mappings().all()
             return rows
 
     async def cypher_execute(self, graph_name: str, cypher_query: str) -> None:
         await self.ensure_age_loaded()
-        async with dbs.sqlalchemy_transaction() as conn:
+        async with dbs.sqlalchemy_transaction() as session:
             age_query = text(f"SELECT * from cypher('{graph_name}', $$ {cypher_query} $$) as (v agtype);")
-            await conn.execute(age_query)
+            await session.execute(age_query)
 
     async def cypher_fetch(self, graph_name: str, cypher_query: str = "MATCH (n) RETURN n UNION ALL MATCH ()-[e]->() RETURN e") -> List[AgtypeRecord]:
         await self.ensure_age_loaded()
         results: List[Row] = []
         if not graph_name:
             raise ValueError("Graph name must be provided.")
-        async with dbs.sqlalchemy_transaction() as conn:
-            result = await conn.execute(text(f"SELECT * from cypher('{graph_name}', $$ {cypher_query} $$) as (v agtype);"))
+        async with dbs.sqlalchemy_transaction() as session:
+            result = await session.execute(text(f"SELECT * from cypher('{graph_name}', $$ {cypher_query} $$) as (v agtype);"))
             for record in result:
                 results.append(record)
         return AgtypeRecord.from_raw_records(results)
@@ -157,7 +157,7 @@ class ApacheAGE:
     ) -> AsyncGenerator[AgGraph, None]:
         graph_name = original_graph.name
 
-        async with dbs.sqlalchemy_transaction() as conn:
+        async with dbs.sqlalchemy_transaction() as session:
             graph_to_patch = original_graph.deepcopy()
             yield graph_to_patch
             patch = AgPatch.from_a_to_b(original_graph, graph_to_patch)
@@ -172,7 +172,7 @@ class ApacheAGE:
             ] + cypher_sql
 
             for stmt in statements:
-                await conn.execute(text(stmt))
+                await session.execute(text(stmt))
 
     async def _patch_graph_apply(
         self,
@@ -180,21 +180,21 @@ class ApacheAGE:
         new_graph: AgGraph
     ) -> AgGraph:
         graph_name = original_graph.name
-        async with dbs.sqlalchemy_transaction() as conn:
+        async with dbs.sqlalchemy_transaction() as session:
             patch = AgPatch.from_a_to_b(original_graph, new_graph)
 
             # Load and setup AGE if not already done
-            await conn.execute(text("LOAD 'age';"))
-            await conn.execute(text("SET search_path = ag_catalog, \"$user\", public;"))
+            await session.execute(text("LOAD 'age';"))
+            await session.execute(text("SET search_path = ag_catalog, \"$user\", public;"))
 
             # Convert the patch to Cypher statements
             cypher_statements = patch.to_cypher_statements()
             stmts = [f"SELECT * FROM cypher('{graph_name}', $$ {stmt} $$) AS (v agtype);" for stmt in cypher_statements]
             for stmt in stmts:
                 if isinstance(stmt, str):
-                    await conn.execute(text(stmt))
+                    await session.execute(text(stmt))
                 else:
-                    await conn.execute(stmt)
+                    await session.execute(stmt)
         return new_graph
 
     async def get_or_create_graph(self, graph_name: str) -> AgGraph:

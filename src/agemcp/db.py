@@ -19,8 +19,17 @@ Base = declarative_base()
 
 def decode_record(record: Row) -> dict:
     """
-    Decode a single SQLAlchemy Row object containing AGE agtype strings
-    into a dict.
+    Decodes a single SQLAlchemy Row object containing AGE agtype strings into a dictionary.
+
+    Iterates through each key-value pair in the Row. If a value is a string containing '::',
+    it is assumed to be an agtype string and is decoded using `decode_agtype_string`.
+    Otherwise, the value is added as-is.
+
+    Args:
+        record (Row): A SQLAlchemy Row object potentially containing agtype strings.
+
+    Returns:
+        dict: A dictionary with decoded agtype values where applicable.
     """
     result = {}
     for key, value in record.items():
@@ -31,10 +40,16 @@ def decode_record(record: Row) -> dict:
     return result
 
 def decode_agtype_string(agtype_string: str) -> Any:
-    """
-    Decode a single agtype string into a Python object.
-    This function should be implemented to handle the specific
-    agtype formats used in your database.
+    """Decodes a single agtype string into a Python object.
+
+    This function attempts to parse the input agtype string as either a JSON object or array.
+    If the string does not match these formats, it returns the string itself.
+
+    Args:
+        agtype_string (str): The agtype string to decode.
+
+    Returns:
+        Any: The decoded Python object, or the original string if decoding is not possible.
     """
     # Placeholder implementation - replace with actual decoding logic
     if agtype_string.startswith('{') and agtype_string.endswith('}'):
@@ -48,11 +63,18 @@ def decode_agtype_string(agtype_string: str) -> Any:
         return agtype_string
 
 def decode_asyncio_agtype_recordset(records: list[Row]) -> list[dict]:
-    """
-    Efficiently decode a list of asyncpg.Record objects containing AGE agtype strings
-    into a list of dicts, using a single json.loads call on a constructed JSON array.
+    """Decodes a list of asyncpg.Record objects containing AGE agtype strings.
+
+    Efficiently decodes a list of asyncpg.Record objects containing AGE agtype strings
+    into a list of dictionaries, using a single json.loads call on a constructed JSON array.
     This version concatenates all agtype strings with commas, replaces '::vertex' and '::edge' with '',
     and wraps the result in brackets.
+
+    Args:
+        records (list[Row]): A list of asyncpg.Record or SQLAlchemy Row objects containing agtype strings.
+
+    Returns:
+        list[dict]: A list of dictionaries decoded from the agtype strings. Returns an empty list if no agtype strings are found.
     """
     agtype_strings = [
         value for record in records
@@ -73,7 +95,11 @@ def decode_asyncio_agtype_recordset(records: list[Row]) -> list[dict]:
 
 @dataclass
 class DbRecord:
-    """A base class for database records with common functionality."""
+    """Base class for database records.
+
+    Provides common serialization and deserialization methods for database records,
+    including conversion to and from dictionaries and JSON strings.
+    """
     
     
     def to_dict(self) -> Dict[str, Any]:
@@ -94,13 +120,13 @@ class DbRecord:
         data = json.loads(json_data)
         return cls.from_dict(data)
 
-    
-    
-
-
-
 @dataclass
 class AgtypeRecord(DbRecord):
+    """Represents an AGE agtype record.
+
+    Used for both vertices and edges in the AGE graph database. Contains label,
+    properties, and optional identifiers for vertices and edges.
+    """
     label      : str
     properties : Dict[str, Any] = field(default_factory=dict)
     id         : int | None = None

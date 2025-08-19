@@ -10,7 +10,22 @@ from agemcp.query_string_codec import QueryStringCodec
 
 
 class DataSourceName(BaseModel):
-    """Database connection string parser and validator."""
+    """Parses, validates, and serializes database connection strings (DSNs).
+
+    This class provides methods to parse DSN strings into structured components,
+    validate them, and serialize them back to string form. It supports masking
+    secrets for safe display and handles query string encoding/decoding.
+
+    Attributes:
+        query_string_codec (QueryStringCodec): Codec for encoding/decoding DSN query strings.
+        driver (str): Database driver (e.g., 'postgresql', 'sqlite3').
+        username (str): Username for authentication.
+        hostname (str): Hostname of the database server.
+        port (int): Port number for the database server.
+        password (SecretStr | None): Password for authentication.
+        database (str | None): Database name.
+        query (OrderedDict[str, Any] | None): Additional DSN settings from the query string.
+    """
 
     query_string_codec: ClassVar[QueryStringCodec] = QueryStringCodec(
         encoding='utf-8',

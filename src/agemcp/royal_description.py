@@ -1,32 +1,44 @@
-import random
+import random, secrets
 
 from typing import ClassVar, List
-
-from nanoid import generate
 
 
 class RoyalDescription:
     """
     Provides canonical adjective order arrays for English noun phrase construction.
 
-    Methods:
-        nanoid_to_int(nanoid: str) -> int:
-            Converts a base62 nanoid string to an integer.
+    This class encapsulates the canonical ordering of English adjectives for noun phrase generation,
+    using class-level lists for each adjective category (quantity, quality, size, age, shape, color,
+    origin, material, purpose, and noun). These lists are typed with `ClassVar[List[str]]` for clarity
+    and type safety, but the class does not use generics or TypeVar. All adjective categories are
+    fixed and idiomatic for English usage.
 
-        __init__():
-            Initializes the RoyalDescription class with a random seed.
+    Methods in this class allow for random selection and generation of noun phrases following
+    canonical adjective order, including reversed order for stylistic variation.
 
-        choose(index: int) -> str:
-            Chooses a random word from the reversed canonical order of adjectives using the instance seed.
+    Instance Methods:
+        choose(index: int): Selects a random adjective from the reversed canonical order at the given index.
 
-        canonical_order_adjectives() -> List[List[str]]:
-            Returns the canonical order of adjectives in English.
+    Class Methods:
+        canonical_order_adjectives(): Returns the canonical order of adjective categories.
+        reversed_canonical_order_adjectives(): Returns the reversed canonical order of adjective categories.
+        generate(words=10, delimiter=' '): Generates a random noun phrase using the canonical adjective order.
 
-        reversed_canonical_order_adjectives() -> List[List[str]]:
-            Returns the reversed canonical order of adjectives in English.
+    Attributes:
+        quantity (ClassVar[List[str]]): Adjectives describing quantity.
+        quality (ClassVar[List[str]]): Adjectives describing quality.
+        size (ClassVar[List[str]]): Adjectives describing size.
+        age (ClassVar[List[str]]): Adjectives describing age.
+        shape (ClassVar[List[str]]): Adjectives describing shape.
+        color (ClassVar[List[str]]): Adjectives describing color.
+        origin (ClassVar[List[str]]): Adjectives describing origin.
+        material (ClassVar[List[str]]): Adjectives describing material.
+        purpose (ClassVar[List[str]]): Adjectives describing purpose.
+        noun (ClassVar[List[str]]): Nouns for phrase construction.
 
-        generate(words=10) -> str:
-            Generates a random description using the canonical adjective order.
+    Example:
+        >>> RoyalDescription.generate(words=5)
+        'ancient blue french silk ox'
     """
 
     quantity : ClassVar[List[str]] = [ "one", "two", "several", "many", "few", "hundred", "dozen", "all", "some", "no" ]
@@ -57,19 +69,7 @@ class RoyalDescription:
         if not (0 <= index <= 8):
             raise ValueError("Index must be between 0 and 8.")
         adjectives = self.reversed_canonical_order_adjectives()[index]
-        random.seed(self.get_seed())
-        return random.choice(adjectives)
-
-
-    def get_seed(self) -> int:
-        alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        nanoid_str = generate(alphabet, 21)
-        base = len(alphabet)
-        value = 0
-        for char in nanoid_str:
-            value = value * base + alphabet.index(char)
-        return value
-    
+        return secrets.choice(adjectives)
 
     @classmethod
     def canonical_order_adjectives(cls) -> List[List[str]]:

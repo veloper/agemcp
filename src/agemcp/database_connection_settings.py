@@ -1,18 +1,59 @@
-
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import AsyncGenerator, Self
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.types import SecretStr
 from sqlalchemy.engine import Engine
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import Literal
 
 from agemcp.data_source_name import DataSourceName
 
 
+# ContextVar-based caches for event-loop safety
+_async_engine_ctx: ContextVar[AsyncEngine | None] = ContextVar("_async_engine_ctx", default=None)
+_async_sessionmaker_ctx: ContextVar[async_sessionmaker | None] = ContextVar("_async_sessionmaker_ctx", default=None)
+
+
 class DatabaseConnectionSettings(BaseModel):
-    """A single database connection configuration with a mandatory _name_ and _dsn_."""
+    """
+    Configuration for a single database connection.
+
+    This class encapsulates all settings required to establish and manage a database connection,
+    including connection parameters, pooling options, timeouts, and TCP keepalive settings.
+
+    Attributes:
+        name (str)                        : Unique name for this database connection.
+        dsn (DataSourceName)              : Data Source Name (DSN) for this database connection.
+        echo (bool)                       : Enable SQL statement logging.
+        encoding (str)                    : Client encoding.
+        timezone (str)                    : IANA timezone name (e.g., 'America/New_York', ISO 8601/ISO 3166).
+        readonly (bool)                   : Open connection in read-only mode.
+        connection_timeout (int | None)   : Connection timeout in seconds.
+        command_timeout (int | None)      : Command execution timeout in seconds, None for no timeout.
+        pool_min_connections (int | None) : Minimum number of connections in the pool.
+        pool_max_connections (int | None) : Maximum number of connections in the pool.
+        pool_max_idle_time (int | None)   : Maximum idle time for connections in the pool (seconds).
+        pool_max_lifetime (int | None)    : Maximum lifetime for connections in the pool (seconds).
+        pool_recycle_time (int | None)    : Time after which connections are recycled (seconds).
+        pool_pre_ping (bool)              : Enable pre-ping to check connection health.
+        pool_max_overflow (int | None)    : Number of connections that can be created beyond the pool size limit.
+        keepalives (bool)                 : Enable TCP keepalives.
+        keepalives_idle (int | None)      : TCP keepalive idle time (seconds).
+        keepalives_interval (int | None)  : TCP keepalive interval (seconds).
+        keepalives_count (int | None)     : TCP keepalive probe count.
+        
+    Methods:
+        from_name_and_dsn(name: str, dsn: str) -> Self
+            : Create a DatabaseConnection instance from a name and DSN string or DataSourceName.
+        sqlalchemy_dispose_async_engine() -> None
+            : Dispose the SQLAlchemy async engine if it exists.
+        sqlalchemy_async_engine() -> AsyncEngine
+            : Get or create the SQLAlchemy async engine for this connection.
+        sqlalchemy_transaction(isolation_level: Literal[...] | None = None) -> AsyncGenerator[AsyncConnection, None]
+            : Async context manager for a SQLAlchemy async transaction.
+    """
 
     # Required
     name                      : str                  = Field(...,            description="Unique name for this database connection")
@@ -43,7 +84,7 @@ class DatabaseConnectionSettings(BaseModel):
 
 
     _sqlalchemy_async_engine: AsyncEngine | None = PrivateAttr(default=None)
-    _sqlalchemy_sync_engine: Engine | None = PrivateAttr(default=None)
+    _sqlalchemy_async_sessionmaker: async_sessionmaker | None = PrivateAttr(default=None)
 
     @field_validator('dsn', mode='before')
     @classmethod
@@ -113,36 +154,44 @@ class DatabaseConnectionSettings(BaseModel):
             self._sqlalchemy_async_engine = None
     
     async def sqlalchemy_async_engine(self) -> AsyncEngine:
-        """Get or create the SQLAlchemy async engine for this connection."""
-        if not self._sqlalchemy_async_engine:
-            
-            # Map user settings to valid SQLAlchemy async engine kwargs
+        """Get or create the SQLAlchemy async engine for this connection, event-loop safe."""
+        engine = _async_engine_ctx.get()
+        if engine is None:
             engine_kwargs = {
                 "echo": self.echo,
                 # "encoding": self.encoding,  # Removed: asyncpg does not support this argument
-                "pool_size": self.pool_min_connections, 
-                "max_overflow": self.pool_max_overflow, 
+                "pool_size": self.pool_min_connections,
+                "max_overflow": self.pool_max_overflow,
                 "pool_timeout": self.connection_timeout,
                 "pool_recycle": self.pool_recycle_time,
                 "pool_pre_ping": self.pool_pre_ping,
-                "pool_use_lifo": False,  # FIFO by default, could be exposed if needed
+                "pool_use_lifo": False,
                 "future": True
             }
-
-            # Remove None values so SQLAlchemy defaults are used
             engine_kwargs = {k: v for k, v in engine_kwargs.items() if v is not None}
+            engine = create_async_engine(str(self.dsn), **engine_kwargs)
+            _async_engine_ctx.set(engine)
+        return engine
 
-            self._sqlalchemy_async_engine = create_async_engine( str(self.dsn), **engine_kwargs )
+    async def sqlalchemy_sessionmaker(self) -> async_sessionmaker:
+        sessionmaker = _async_sessionmaker_ctx.get()
+        if sessionmaker is None:
+            engine = await self.sqlalchemy_async_engine()
+            sessionmaker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            _async_sessionmaker_ctx.set(sessionmaker)
+        return sessionmaker
 
-        return self._sqlalchemy_async_engine
-
-
+    @asynccontextmanager
+    async def sqlalchemy_session(self) -> AsyncGenerator[AsyncSession, None]:
+        sessionmaker = await self.sqlalchemy_sessionmaker()
+        async with sessionmaker() as session:
+            yield session
 
     @asynccontextmanager
     async def sqlalchemy_transaction(
-        self, 
+        self,
         isolation_level: Literal["READ UNCOMMITTED", "READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE"] | None = None
-    ) -> AsyncGenerator[AsyncConnection, None]:
+    ) -> AsyncGenerator[AsyncSession, None]:
         """
         Async context manager for a SQLAlchemy async transaction.
 
@@ -150,11 +199,11 @@ class DatabaseConnectionSettings(BaseModel):
             isolation_level: Optional transaction isolation level.
 
         Yields:
-            AsyncConnection with an active transaction (committed or rolled back on exit).
+            AsyncSession with an active transaction (committed or rolled back on exit).
         """
-        engine = await self.sqlalchemy_async_engine()
-        async with engine.connect() as conn:
+        async with self.sqlalchemy_session() as session:
             if isolation_level is not None:
+                conn = await session.connection()
                 await conn.execution_options(isolation_level=isolation_level)
-            async with conn.begin():
-                yield conn
+            async with session.begin():
+                yield session
