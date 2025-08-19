@@ -31,6 +31,21 @@ class AppSettings(BaseSettings):
     def package_path(self) -> Path: return self.src_path / "agemcp"
         
         
+class McpSettings(BaseSettings):
+    """MCP Server configuration."""
+    port: int = Field(default=7999, description="MCP server port")
+    host: str = Field(default="0.0.0.0", description="MCP server host")
+    transport: str = Field(
+        default="streamable-http",
+        description="MCP server transport protocol",
+        pattern=r"^(sse|streamable-http|stdio)$"
+    )
+    log_level: str = Field(
+        default="DEBUG",
+        description="MCP server log level",
+        pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
+    )
+
     
 class DbSettings(BaseSettings):
 
@@ -99,8 +114,9 @@ class Settings(BaseSettings):
         env_file_encoding='utf-8',
         env_nested_delimiter='__',
     )
-            
-    app: AppSettings 
+    
+    app: AppSettings
+    mcp: McpSettings
     db: DbSettings
     age: AgeSettings
     env: Environment = Field(default_factory=Environment.current, description="Current application environment")
