@@ -23,12 +23,12 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.traceback import install as install_traceback
 
+from agemcp.environment import Environment
 from agemcp.settings import get_settings
 
 
-ROOT_PATH = Path(__file__).parent.parent.parent
-ENV_PATH = ROOT_PATH / ".env"
-ENV_EXAMPLE_PATH = ROOT_PATH / ".env.example"
+ENV_PATH = Environment.get_dotenv_path()
+ENV_EXAMPLE_PATH = Path(__file__).parent / ".env.example"
 
 console = Console()
 install_traceback(show_locals=True, word_wrap=True, console=console)
@@ -271,7 +271,7 @@ if ENV_PATH.exists():
         
         console.log(f"Running server with command: {' '.join(full_cmd)}")
 
-        os.chdir(str(get_settings().app.root_path))
+        os.chdir(str(get_settings().app.package_path))
         os.execvp(str(cmd), full_cmd)
     
 def main() -> None:

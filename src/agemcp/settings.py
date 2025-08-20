@@ -15,22 +15,18 @@ from agemcp.database_connection_settings import DatabaseConnectionSettings
 from agemcp.environment import Environment
 
 
-ROOT_PATH = Path(__file__).parent.parent.parent
-ENV_FILE_PATH = ROOT_PATH / Environment.get_dotenv_filename()
+ENV_FILE_PATH = Environment.get_dotenv_path()
+ENV_FILE_DIR_PATH = Path(ENV_FILE_PATH).parent
 
 class AppSettings(BaseSettings):
     """Main application configuration."""
 
     log_level: str = Field(default="INFO", description="Logging level", pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
-    root_path: Path = Field(default=ROOT_PATH, description="Root path of the application")
     
     @property
-    def src_path(self) -> Path: return self.root_path / "src"
-    
-    @property
-    def package_path(self) -> Path: return self.src_path / "agemcp"
-        
-        
+    def package_path(self) -> Path: return Path(__file__).parent
+
+
 class McpSettings(BaseSettings):
     """MCP Server configuration."""
     port: int = Field(default=7999, description="MCP server port")
@@ -88,7 +84,7 @@ class Settings(BaseSettings):
     """Complete application settings with multi-database support."""
     
     model_config = SettingsConfigDict(
-        env_file=(ENV_FILE_PATH), # you are here trying to figure out why this is not as expected even with the singleton of environment being confirmed set to testing
+        env_file=(ENV_FILE_PATH),
         env_file_encoding='utf-8',
         env_nested_delimiter='__',
     )
@@ -107,7 +103,7 @@ class _SettingsTesting(Settings):
     """Settings for testing environment."""
     
     model_config = SettingsConfigDict(
-        env_file=(ROOT_PATH / '.env.testing'),
+        env_file=(str(ENV_FILE_DIR_PATH / '.env.testing')),
         env_file_encoding='utf-8',
         env_nested_delimiter='__',
     )
@@ -117,7 +113,7 @@ class _SettingsDevelopment(Settings):
     """Settings for development environment."""
     
     model_config = SettingsConfigDict(
-        env_file=(ROOT_PATH / '.env'),
+        env_file=(str(ENV_FILE_DIR_PATH / '.env')),
         env_file_encoding='utf-8',
         env_nested_delimiter='__',
     )

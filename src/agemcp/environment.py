@@ -1,6 +1,7 @@
 import os
 
 from enum import Enum
+from pathlib import Path
 from typing import Self
 
 
@@ -62,10 +63,28 @@ class Environment(Enum):
     @classmethod
     def get_dotenv_filename(cls) -> str:
         """Get the appropriate .env filename based on the current environment."""
-        if cls.current() == cls.DEVELOPMENT:
-            return '.env'
-        return f'.env.{cls.current().value}'
+        basename = 'env'
 
+        # if pipx, use special .env filename as it will be system-wide
+        if cls.is_pipx_facility():
+            return '.agempc.env'
+
+        # if dev, assume it's just a plain .env
+        if cls.current() == cls.DEVELOPMENT:
+            return f".{basename}"
+        
+        return f".{basename}.{cls.current().value}"
+
+    @classmethod
+    def get_dotenv_path(cls) -> Path:
+        """Get the full path to the appropriate .env file based on the current environment."""
+        base_path = Path.home() if cls.is_pipx_facility() else Path(__file__).resolve().parent.parent.parent
+        return base_path / cls.get_dotenv_filename()
+
+    @classmethod
+    def is_pipx_facility(cls) -> bool:
+        """Check if the current environment is running from within the pipx facility."""
+        return "pipx" in __file__
 
 def get_current_env() -> Environment: 
     """Get the current environment."""
