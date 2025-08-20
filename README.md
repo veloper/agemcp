@@ -2,7 +2,7 @@
 
 These tools provide an interface for AI Agents to manage multiple graphs in Apache AGE. They expose tools for creating, updating, administering, and visualizing graphs.
 
-| Tool Name               | Purpose/Description                                                                 | Arguments                                                                                   |
+| Tool Name               | Description                                                                 | Parameters                                                                                   |
 |-------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
 | `get_or_create_graph`   | Get or create a graph with the specified name.                                      | `graph_name: str`                                                                           |
 | `list_graphs`           | List all graph names in the database.                                               |                                                                                             |
@@ -15,41 +15,34 @@ These tools provide an interface for AI Agents to manage multiple graphs in Apac
 | `generate_visualization`| Generate a single-page HTML file visualizing a graph using vis.js and pyvis.        | `graph_name: str`                                                                           |
 
 
-## Server Setup
+## Server Installation
 
-1. Clone the repository:
+Install the latest release using pipx (recommended for CLI/server tools):
 
-    ```bash
-    git clone <repository-url> /your/local/path/to/agemcp
-    ```
+```bash
 
-2. Navigate to the project directory:
+# Install
+pipx install agemcp
 
-    ```bash
-    cd /your/local/path/to/agemcp
-    ```
-3. Install the required dependencies:
+# Postgres DSN / MCP Server Defaults
+agemcp config
 
-    ```bash
-    uv sync
-    ```
-4. Run the server:
+# Start the server
+agemcp run
+```
 
-    ```bash
-    uv run agemcp run --port 8000 --transport streamable-http
-    ```
-   You should see something like this:
+You should see something like this:
 
-    ```
-    [07/30/25 14:32:54] INFO     Starting MCP server 'agemcp' with transport 'streamable-http' on http://0.0.0.0:8000/mcp/
-    INFO:     Started server process [13951]
-    INFO:     Waiting for application startup.
-    INFO:     Application startup complete.
-    INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-    ```
+```bash
+INFO:     Starting MCP server 'agemcp' with transport 'streamable-http' on http://0.0.0.0:8000/mcp/
+INFO:     Started server process [13951]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
 
 
-## Client Setup
+## Client Installation
 
 ### VSCode
 1. Open Command Palette (Cmd+Shift+P or Ctrl+Shift+P).

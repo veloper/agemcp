@@ -51,7 +51,22 @@ class DbSettings(BaseSettings):
 
     model_config = SettingsConfigDict( env_nested_delimiter='__')
 
-    connections: Dict[str, DatabaseConnectionSettings]
+    dsn: str
+    echo: bool | None         = Field(default=None)
+    pool_min_connections: int = Field(default=5)
+    pool_max_connections: int = Field(default=10)
+    pool_max_overflow: int    = Field(default=20)
+
+    @property
+    def connections(self) -> Dict[str, DatabaseConnectionSettings]:
+        dcs = DatabaseConnectionSettings.from_name_and_dsn( "primary", self.dsn )
+        dcs.pool_min_connections = self.pool_min_connections
+        dcs.pool_max_connections = self.pool_max_connections
+        dcs.pool_max_overflow = self.pool_max_overflow
+
+        return {
+            "primary": dcs
+        }
 
     def get_primary(self) -> DatabaseConnectionSettings:
         if primary := self.connections.get("primary", None):
@@ -59,44 +74,7 @@ class DbSettings(BaseSettings):
         raise ValueError("Primary database connection is not defined or is invalid.")
     
     
-    def get_primary_sync(self) -> DatabaseConnectionSettings:
-        """Get the primary database connection settings for synchronous operations."""
-        if primary_sync := self.connections.get("primary_sync", None):
-            return primary_sync
-        raise ValueError("Primary synchronous database connection is not defined or is invalid.")
     
-    # Remove explicit close method; add lazy pool recreation in pool property
-    @field_validator('connections', mode='before')
-    @classmethod
-    def validate_connections(cls, v: Dict[str, Dict[str, Any]]) -> Dict[str, DatabaseConnectionSettings]:
-        """
-        We're getting this...
-        
-        DB__CONNECTIONS='{
-            "primary": {
-                "dsn": "postgresql://postgres@localhost:5432/postgres",
-                "echo": true
-            },
-            "primary_sync": {
-                "dsn": "postgresql+psycopg://postgres@localhost:5432/postgres",
-                "echo": true
-            }
-        }'
-        
-        and we need to coerce this into `primary: DatabaseConnectionSettings(...)`
-        """
-        # at this point its already a dict, so we can just convert it
-        connections = {}
-        for name, conn_data in v.items():
-            db_name = name
-            if isinstance(conn_data, dict) and 'dsn' in conn_data and isinstance(conn_data['dsn'], str):
-                if (db_dsn := conn_data.get('dsn')):
-                    connections[db_name] = DatabaseConnectionSettings.from_name_and_dsn(db_name, db_dsn)
-
-        if "primary" not in connections:
-            raise ValueError("Primary database connection must be defined with the name 'primary'.")
-
-        return connections
         
 
 class AgeSettings(BaseSettings):
