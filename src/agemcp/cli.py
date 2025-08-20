@@ -277,11 +277,11 @@ if ENV_PATH.exists():
         cmd = "fastmcp"
         spec = get_settings().app.package_path / "server.py"
         full_cmd = [str(cmd), "run", str(spec), "--port", str(port), "--host", host, "--transport", transport, "--log-level", log_level]
-        
-        console.log(f"Running server with command: {' '.join(full_cmd)}")
 
-        os.chdir(str(get_settings().app.package_path))
-        os.execvp(str(cmd), full_cmd)
+        if log_level in ["DEBUG", "INFO"]:
+            console.log(f"Running server with command: {' '.join(full_cmd)}")
+
+        os.execvpe(str(cmd), full_cmd, os.environ)
     
 def main() -> None:
     """
