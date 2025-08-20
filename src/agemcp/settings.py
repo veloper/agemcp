@@ -113,7 +113,7 @@ class _SettingsDevelopment(Settings):
     """Settings for development environment."""
     
     model_config = SettingsConfigDict(
-        env_file=(str(ENV_FILE_DIR_PATH / '.env')),
+        env_file=(str(ENV_FILE_PATH)),
         env_file_encoding='utf-8',
         env_nested_delimiter='__',
     )
