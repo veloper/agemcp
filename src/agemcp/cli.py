@@ -166,6 +166,15 @@ class DotEnvFile:
         if not self.path.exists():
             self.path.write_text("")
 
+        # Remove _META key before saving (in memory and on disk)
+        if "_META" in self._values:
+            del self._values["_META"]
+            try:
+                from dotenv import unset_key
+                unset_key(self.path, "_META")
+            except ImportError:
+                pass
+
         for key, value in self.values.items():
             set_key(self.path, key, str(value))
 
