@@ -1,6 +1,6 @@
 [project]
 name = "agemcp"
-version = "0.5.2"
+version = "0.5.3"
 description = "PostgreSQL MCP"
 readme = "README.md"
 authors = [

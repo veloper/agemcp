@@ -274,14 +274,27 @@ if ENV_PATH.exists():
         Note: see all settings using the `settings` command.
 
         """
-        cmd = "fastmcp"
+        import asyncio
+
+        from typing import cast
+
+        from fastmcp.cli.run import LogLevelType, TransportType, run_command
+
         spec = get_settings().app.package_path / "server.py"
-        full_cmd = [str(cmd), "run", str(spec), "--port", str(port), "--host", host, "--transport", transport, "--log-level", log_level]
-
+        server_spec = str(spec)
+        # Log for debug/info
         if log_level in ["DEBUG", "INFO"]:
-            console.log(f"Running server with command: {' '.join(full_cmd)}")
+            console.log(f"Running server via direct import: {server_spec}")
 
-        os.execvpe(str(cmd), full_cmd, os.environ)
+        # Map CLI args to run_command
+        asyncio.run(run_command(
+            server_spec=server_spec,
+            transport=cast(TransportType, transport),
+            host=host,
+            port=port,
+            log_level=cast(LogLevelType, log_level),
+            show_banner=True
+        ))
     
 def main() -> None:
     """
